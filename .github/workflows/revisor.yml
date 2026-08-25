@@ -1,0 +1,69 @@
+name: Revisor
+
+# Solo sobre cambios propuestos: al abrirlos y en cada push que los actualice.
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+# Leer el código y escribir en el pull request —los hallazgos van como
+# comentarios— y nada más. Sin `id-token: write`: la credencial llega por un
+# secreto del repositorio, no por federación OIDC.
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  review:
+    name: Revisión de Claude
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    # Un pull request desde un fork no recibe los secretos del repositorio y su
+    # `GITHUB_TOKEN` es de solo lectura, así que este trabajo no podría ni
+    # autenticarse ni comentar. Se salta explícitamente para no dejar un fallo
+    # rojo y confuso en cada contribución externa. Las alternativas, con sus
+    # riesgos, están en `docs/ci-revisor.md`.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+
+    steps:
+      - name: Traer el repositorio
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+
+      - name: Revisar el cambio
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
+            Revisa este pull request de FlowSync. La rama ya está en el
+            directorio de trabajo.
+
+            El árbitro de lo que el código debe hacer son los scenarios de
+            `openspec/specs/`, no tu criterio: cuando un cambio se desvíe de un
+            requisito, cita cuál. Lo demás que interesa, por orden:
+
+            - Fallos de corrección y casos límite sin cubrir.
+            - Fugas de datos en las respuestas: cada respuesta pasa por un
+              transformer de `app/transformers/`, y lo que no esté en el
+              transformer no debe viajar.
+            - Cambios en rutas, controladores, validadores o transformers que no
+              actualicen `docs/api/openapi.json` ni el README de la capability.
+            - Supuestos frágiles y complejidad que no se sostenga.
+
+            No apruebes por aprobar y no repitas lo que el diff ya dice.
+            Prioriza los hallazgos (crítico / alto / medio) y da evidencia
+            `archivo:línea`.
+
+            Publica los hallazgos en el pull request, no como mensajes:
+            `mcp__github_inline_comment__create_inline_comment` (con
+            `confirmed: true`) para señalar líneas concretas, y `gh pr comment`
+            para el resumen general.
+
+          # `--max-turns` acota la conversación; `timeout-minutes` acota el reloj.
+          claude_args: |
+            --max-turns 15
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"
