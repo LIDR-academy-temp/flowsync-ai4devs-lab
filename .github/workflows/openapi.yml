@@ -1,0 +1,57 @@
+name: OpenAPI
+
+# El documento versionado tiene que seguir siendo el que produce el router. Se
+# comprueba en cada cambio propuesto y en cada push a la rama principal, que son
+# los dos momentos en los que puede quedarse atrás sin que nadie lo vea.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Lo único que necesita es leer el código. No comenta en el PR, no publica nada
+# y no escribe en el repositorio.
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: openapi:check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    defaults:
+      run:
+        working-directory: backend
+
+    # `openapi:check` arranca la aplicación para leer el router, y `start/env.ts`
+    # valida el entorno al arrancar. Ninguno de estos valores es un secreto: el
+    # comando no abre puertos, no firma nada y no toca la base de datos, así que
+    # la `APP_KEY` es de usar y tirar y está aquí a la vista a propósito.
+    env:
+      NODE_ENV: test
+      PORT: '3333'
+      HOST: localhost
+      LOG_LEVEL: info
+      APP_URL: http://localhost:3333
+      SESSION_DRIVER: memory
+      APP_KEY: clave-de-usar-y-tirar-solo-para-arrancar-la-app-en-ci
+
+    steps:
+      - name: Traer el repositorio
+        uses: actions/checkout@v5
+
+      - name: Preparar Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Instalar dependencias del backend
+        run: npm ci
+
+      # Regenera el documento en un directorio temporal y lo compara con
+      # `docs/api/openapi.json`. Si no coinciden, enumera las diferencias y
+      # termina con código 1. Nunca reescribe el fichero versionado.
+      - name: Comprobar el documento OpenAPI
+        run: npm run openapi:check
