@@ -46,11 +46,6 @@ jobs:
           # los permisos declarados arriba y caduca al terminar.
           github_token: ${{ secrets.GITHUB_TOKEN }}
 
-          # TEMPORAL: la salida del SDK viene oculta y `permission_denials_count`
-          # dice cuántas herramientas se rechazan pero no cuáles. Se quita en
-          # cuanto la allowlist esté cerrada.
-          show_full_output: true
-
           prompt: |
             REPO: ${{ github.repository }}
             PR NUMBER: ${{ github.event.pull_request.number }}
@@ -62,6 +57,9 @@ jobs:
             qué cuenta como grave en este proyecto, cuántas sugerencias menores
             caben, dónde no se reporta y qué tienes que citar para afirmar que
             algo se comporta de una manera. Manda ese fichero, no tu criterio.
+
+            No redirijas salida a ficheros (`> algo.diff`): no puedes escribir
+            en el runner y cada intento te cuesta un turno. Lee la salida directa.
 
             Publica los hallazgos en el pull request, no como mensajes:
             `mcp__github_inline_comment__create_inline_comment` (con
@@ -79,5 +77,5 @@ jobs:
           claude_args: |
             --model sonnet
             --effort medium
-            --max-turns 20
-            --allowedTools "Read,Grep,Glob,TodoWrite,mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*)"
+            --max-turns 30
+            --allowedTools "Read,Grep,Glob,TodoWrite,mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git fetch:*),Bash(wc:*)"
