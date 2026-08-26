@@ -6,8 +6,12 @@ on:
     types: [opened, synchronize]
 
 # Leer el código y escribir en el pull request —los hallazgos van como
-# comentarios— y nada más. Sin `id-token: write`: la credencial llega por un
-# secreto del repositorio, no por federación OIDC.
+# comentarios— y nada más.
+#
+# Sin `id-token: write`, que el ejemplo oficial sí lleva: ese permiso solo hace
+# falta si la acción tiene que acuñar su propio token de GitHub por OIDC, y eso
+# se evita pasándole `github_token` abajo. Quitarlo sin pasar el token deja el
+# trabajo fallando en bucle con «Could not fetch an OIDC token».
 permissions:
   contents: read
   pull-requests: write
@@ -35,6 +39,13 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+
+          # Sin esto la acción pide un token de GitHub por OIDC —`github_token`
+          # llega como `OVERRIDE_GITHUB_TOKEN` y ese intercambio se salta— y
+          # exigiría `id-token: write`. El token del trabajo ya está acotado a
+          # los permisos declarados arriba y caduca al terminar.
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
           prompt: |
             REPO: ${{ github.repository }}
             PR NUMBER: ${{ github.event.pull_request.number }}

@@ -8,9 +8,15 @@ hallazgos **en el propio pull request**: comentarios de línea con
 Lleva `--max-turns 15` y `timeout-minutes: 15`, y pide solo `contents: read` y
 `pull-requests: write`.
 
-> **Nada de esto se ha ejecutado todavía.** El workflow está escrito y su YAML es
-> válido, pero no ha corrido ni una vez: hasta que existan el secreto y un pull
-> request de prueba, no hay ninguna ejecución que lo demuestre.
+> **Por qué no lleva `id-token: write`, que el ejemplo oficial sí incluye.** Ese
+> permiso solo hace falta si la acción tiene que acuñar su propio token de GitHub
+> por OIDC. Pasándole `github_token: ${{ secrets.GITHUB_TOKEN }}` ese intercambio
+> se salta —el input llega como `OVERRIDE_GITHUB_TOKEN` y la acción devuelve el
+> token sin pedir nada—, así que el trabajo se queda con los dos permisos que de
+> verdad usa. Quitar el permiso **sin** pasar el token es lo que no funciona: la
+> acción reintenta y falla con «Could not fetch an OIDC token. Did you remember to
+> add `id-token: write` to your workflow permissions?», comprobado en una
+> ejecución real.
 
 ## Pasos manuales pendientes
 
