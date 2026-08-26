@@ -63,7 +63,16 @@ jobs:
             `confirmed: true`) para señalar líneas concretas, y `gh pr comment`
             para el resumen general.
 
-          # `--max-turns` acota la conversación; `timeout-minutes` acota el reloj.
+          # `--max-turns` acota el trabajo; `timeout-minutes`, de arriba, acota el
+          # reloj. No son lo mismo: bajar los turnos no hace que termine antes,
+          # hace que se quede a medias y el trabajo salga en rojo sin publicar
+          # nada.
+          #
+          # `Read`, `Grep` y `Glob` son imprescindibles: sin ellas el revisor no
+          # puede abrir `REVIEW.md`, ni la spec, ni un solo fichero del cambio, y
+          # cada intento se le va en un turno denegado. Son de solo lectura.
           claude_args: |
-            --max-turns 15
-            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"
+            --model sonnet
+            --effort medium
+            --max-turns 20
+            --allowedTools "Read,Grep,Glob,mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"
