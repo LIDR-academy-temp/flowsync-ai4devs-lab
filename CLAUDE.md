@@ -155,6 +155,13 @@ Organización de `src/`:
 
 La URL de la API sale de `VITE_API_URL` (ver `frontend/.env.example`); por defecto `http://localhost:3333`.
 
+### De dónde sale una pieza de interfaz nueva
+
+- **Primero el catálogo.** Hoy `src/components/ui/` tiene `alert`, `button`, `card`, `input`, `label` y `progress`. Antes de escribir un botón, un campo, un aviso, una tarjeta o una barra, mira ahí.
+- **Si falta, se trae; no se escribe.** `npx shadcn@latest add <componente>` desde `frontend/`. Revisa lo que genera: que `cn` venga de `@/lib/utils` y que `package.json` no gane dependencias (el CLI ya generó un `import` de un paquete npm ajeno que además instaló). Si hay que corregir algo a mano, se dice.
+- **Dibujar a mano fuera de `ui/` se declara.** Un elemento de interfaz que el catálogo ya sabe hacer (o que debería tener) escrito por su cuenta en `components/` o `pages/` es una decisión: lleva un comentario que diga por qué no sirve el catálogo. No es un descuido que se deja pasar.
+- **Los colores tienen nombre.** Salen de los tokens de `src/index.css` (`bg-primary`, `text-destructive`...), no de un hexadecimal ni de `bg-blue-600`. El hook `PostToolUse` `.claude/hooks/color-con-nombre.sh` avisa, sin bloquear, cuando se escribe uno a pelo; no ve lo demás de esta lista, y eso lo cuida esta regla.
+
 ## Reglas de proceso
 - Convenciones de base de datos (única fuente, no se copian aquí): @docs/convenciones/base-de-datos.md
 - Cualquier tarea de backend se hace con la skill `backend-feature` (`.claude/skills/backend-feature/SKILL.md`), sin que nadie tenga que pedirlo: plan por capas y parada para aprobarlo, tests de contrato con el subagente `test-writer`, rojo, tests congelados por su `shasum`, implementación con el subagente `implementer` hasta el verde, y cierre con `dbhub`, `openapi:check` y Postman.
