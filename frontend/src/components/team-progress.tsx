@@ -29,7 +29,15 @@ export function TeamProgress({ progress }: TeamProgressProps) {
         </p>
         <p className="font-medium tabular-nums">{percent} %</p>
       </div>
-      <Progress value={percent} aria-label="Avance del equipo" />
+      {/* Azul a pelo a propósito, por decisión expresa y solo para esta barra:
+          no hay un token de index.css para él. El relleno es un hijo de
+          `Progress` y no admite `className` propio, así que se tiñe desde aquí
+          con un selector de hijo y sin tocar el catálogo. */}
+      <Progress
+        value={percent}
+        aria-label="Avance del equipo"
+        className="[&>[data-slot=progress-indicator]]:bg-blue-600"
+      />
     </div>
   )
 }
