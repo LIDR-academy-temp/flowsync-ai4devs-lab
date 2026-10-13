@@ -136,9 +136,10 @@ ui: ## Arranca el catálogo de componentes (Storybook, http://localhost:6006)
 test-ui: ## Corre las comprobaciones sobre las historias, sin ventana
 	@cd $(FRONTEND) && npx vitest run --project=storybook
 
-# El recorrido de navegador (varias piezas juntas, contra la app arrancada) AÚN NO
-# EXISTE: el frontend solo tiene las historias de arriba. Hasta que haya un
-# `playwright.config.*` esta receta falla a propósito en vez de salir en verde sin
+# El recorrido de navegador (varias piezas juntas, contra la app arrancada): un solo
+# test en frontend/e2e/. Necesita `make start` corriendo en otra terminal, y crea una
+# cuenta y una tarea de verdad en la base a la que apunte el backend. Sin
+# `playwright.config.*` la receta falla a propósito en vez de salir en verde sin
 # haber corrido nada.
 test-web: ## Corre el recorrido de navegador (Playwright)
 	@cd $(FRONTEND) && if ls playwright.config.* >/dev/null 2>&1; then \
