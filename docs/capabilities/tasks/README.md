@@ -120,6 +120,14 @@ En el frontend, la capability vive en [`pages/tasks-page.tsx`](../../../frontend
 en [`lib/api.ts`](../../../frontend/src/lib/api.ts). Los requisitos de interfaz de la spec son los que
 empiezan por «La interfaz SHALL…».
 
+**El avance del equipo** (recuento, porcentaje y barra encima del listado) lo pinta
+[`components/team-progress.tsx`](../../../frontend/src/components/team-progress.tsx) con la barra
+`Progress` del catálogo y el redondeo de [`lib/progress.ts`](../../../frontend/src/lib/progress.ts).
+No sale de la lista que se ve, que es solo lo que deja pasar el filtro, sino de dos consultas a
+`GET /tasks`: la de por defecto (lo abierto) y la de `status=done`. Total = abiertas + hechas. No hay
+endpoint de recuento ni cambio de backend. La pantalla lo ajusta en el acto al crear o cambiar de
+estado y lo confirma después con las dos consultas.
+
 ## Cómo se prueba en local
 
 ### Preparar el backend

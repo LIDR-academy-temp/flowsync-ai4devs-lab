@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { AlertCircleIcon, InfoIcon, Loader2Icon } from 'lucide-react'
 import * as api from '@/lib/api'
@@ -7,6 +7,7 @@ import { useAuth } from '@/auth/use-auth'
 import { useAuthForm } from '@/auth/use-auth-form'
 import { TaskItem } from '@/components/task-item'
 import { TaskFilter } from '@/components/task-filter'
+import { TeamProgress } from '@/components/team-progress'
 import { FieldError } from '@/components/field-error'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
@@ -45,6 +46,14 @@ export function TasksPage() {
   // Cuántas tareas hechas hay, para distinguir «el espacio está vacío» de
   // «no queda nada abierto». Solo se resuelve cuando hace falta.
   const [doneCount, setDoneCount] = useState<number | null>(null)
+  // El avance de todo el equipo. Va aparte de `tasks` a propósito: `tasks` es
+  // solo lo que deja pasar el filtro, y con la vista por defecto ni siquiera
+  // trae las hechas. `null` es «no hay cifra fiable» y no se pinta.
+  const [progress, setProgress] = useState<{
+    done: number
+    total: number
+  } | null>(null)
+  const progressVersion = useRef(0)
   const [title, setTitle] = useState('')
   const [statusError, setStatusError] = useState<string | null>(null)
   // Lo que una acción mía se ha llevado fuera de la vista actual. No es un
@@ -66,6 +75,49 @@ export function TasksPage() {
         : DEFAULT_LIST_STATUSES.includes(status),
     [statusParam],
   )
+
+  /**
+   * Recalcula el avance contra el servidor. El total es lo abierto más lo
+   * hecho: la lista sin acotar nunca trae las hechas, así que hacen falta las
+   * dos consultas. Cada petición y cada ajuste local suben la versión, y una
+   * respuesta solo se aplica si sigue siendo la última: así una respuesta que
+   * salió antes de una acción nunca pisa la cifra que esa acción ya movió.
+   */
+  const refreshProgress = useCallback(() => {
+    if (!token) return
+
+    const version = ++progressVersion.current
+
+    Promise.all([api.listTasks(token), api.listTasks(token, 'done')])
+      .then(([open, done]) => {
+        if (version !== progressVersion.current) return
+        setProgress({ done: done.length, total: open.length + done.length })
+      })
+      // Sin cifra no se enseña nada, y esto no es motivo para alarmar: la
+      // lista tiene su propio aviso de error. Si ya había una cifra buena,
+      // se queda la que había.
+      .catch(() => {})
+  }, [token])
+
+  // Lo que una acción propia mueve en el avance, en el acto. Se confirma
+  // después con `refreshProgress`, que además recoge lo que hayan hecho otros.
+  const shiftProgress = useCallback((done: number, total: number) => {
+    progressVersion.current += 1
+    setProgress(
+      (current) =>
+        current && { done: current.done + done, total: current.total + total },
+    )
+  }, [])
+
+  // El avance no depende del filtro: se pide al entrar, no al acotar.
+  useEffect(() => {
+    setProgress(null)
+    refreshProgress()
+
+    return () => {
+      progressVersion.current += 1
+    }
+  }, [refreshProgress])
 
   useEffect(() => {
     if (!token) return
@@ -142,6 +194,9 @@ export function TasksPage() {
       // recién creada entra por arriba. Sin recargar ni volver a pedirla.
       setTasks((current) => [created, ...(current ?? [])])
       setTitle('')
+      // Toda tarea nace pendiente: entra en el total y no en las hechas.
+      shiftProgress(0, 1)
+      refreshProgress()
 
       // Toda tarea nace pendiente, así que con el filtro puesto en otro estado
       // el formulario parecería no hacer nada. Se dice dónde ha ido a parar.
@@ -158,6 +213,10 @@ export function TasksPage() {
       if (!token || task.status === status || pendingIds.has(task.id)) return
 
       const previousStatus = task.status
+      // Solo cuenta entrar en «Hecho» o salir de él; entre pendiente y en
+      // curso el avance no se mueve.
+      const doneShift =
+        Number(status === 'done') - Number(previousStatus === 'done')
 
       // El estado se pinta antes de que conteste el servidor: esperar a la red
       // no es «de inmediato». Si la petición falla, la fila vuelve al estado
@@ -169,6 +228,7 @@ export function TasksPage() {
           ) ?? current,
       )
       setPendingIds((current) => new Set(current).add(task.id))
+      if (doneShift) shiftProgress(doneShift, 0)
       setStatusError(null)
       setNotice(
         // Si el cambio la saca de la vista actual, desaparecer no puede
@@ -192,6 +252,7 @@ export function TasksPage() {
               item.id === task.id ? { ...item, status: previousStatus } : item,
             ) ?? current,
         )
+        if (doneShift) shiftProgress(-doneShift, 0)
         setNotice(null)
         setStatusError(
           `No se ha podido cambiar el estado. ${
@@ -204,9 +265,10 @@ export function TasksPage() {
           next.delete(task.id)
           return next
         })
+        refreshProgress()
       }
     },
-    [matchesFilter, pendingIds, token],
+    [matchesFilter, pendingIds, refreshProgress, shiftProgress, token],
   )
 
   // Lo que se pinta no es lo que trajo la API sino lo que sigue cumpliendo el
@@ -293,6 +355,8 @@ export function TasksPage() {
             <AlertDescription>{notice}</AlertDescription>
           </Alert>
         )}
+
+        <TeamProgress progress={progress} />
 
         {visibleTasks === undefined ? (
           <div
