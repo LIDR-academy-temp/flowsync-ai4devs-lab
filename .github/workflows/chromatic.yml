@@ -1,0 +1,51 @@
+name: Chromatic
+
+# Cada cambio propuesto: publica el Storybook del frontend en Chromatic, para
+# que se pueda ver y comparar cómo queda cada historia antes de aceptar el cambio.
+on:
+  pull_request:
+
+# Lo único que hace este trabajo es leer el repositorio y subir el Storybook a
+# Chromatic con el token del proyecto. No escribe en el repositorio.
+permissions:
+  contents: read
+
+# Si llegan dos pushes seguidos a la misma referencia, solo interesa el último.
+concurrency:
+  group: chromatic-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  chromatic:
+    name: Publicar el Storybook en Chromatic
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      # Chromatic compara contra la historia de git: necesita todos los commits,
+      # no solo el último.
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Instalar dependencias del frontend
+        run: npm ci
+        working-directory: frontend
+
+      # El token vive en el secreto CHROMATIC_PROJECT_TOKEN del repositorio.
+      #
+      # OJO: un pull request que viene de un FORK no recibe los secretos del
+      # repositorio. En ese caso `secrets.CHROMATIC_PROJECT_TOKEN` llega vacío y
+      # este paso falla, y no es un fallo del código del PR: no hay token con el
+      # que publicar. Esos cambios hay que probarlos en local (`make test-ui`,
+      # `make ui`) o volver a abrirlos desde una rama de este repositorio.
+      - name: Publicar en Chromatic
+        uses: chromaui/action@v18
+        with:
+          projectToken: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
+          workingDir: frontend
