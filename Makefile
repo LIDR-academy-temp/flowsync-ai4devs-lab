@@ -14,7 +14,7 @@ BACKEND  := backend
 FRONTEND := frontend
 
 .DEFAULT_GOAL := help
-.PHONY: test-unit test-e2e help setup start install env db-up db-down migrate seed db-readonly copia-produccion test clean
+.PHONY: test-unit test-e2e ui test-ui test-web help setup start install env db-up db-down migrate seed db-readonly copia-produccion test clean
 
 # La ayuda se genera a partir de los comentarios `## ...` de cada target, para
 # que no haya un segundo listado que mantener a mano y que pueda divergir.
@@ -123,6 +123,29 @@ test-unit: migrate ## Solo la suite unitaria (sin servidor ni base de datos)
 
 test-e2e: migrate ## Solo la suite funcional: peticiones HTTP reales contra la base de pruebas
 	@cd $(BACKEND) && node ace test functional
+
+# ---------------------------------------------------------------------------
+# catálogo y pruebas del frontend
+# ---------------------------------------------------------------------------
+
+ui: ## Arranca el catálogo de componentes (Storybook, http://localhost:6006)
+	@cd $(FRONTEND) && npm run storybook
+
+# Cada historia del catálogo se monta en un Chromium sin ventana y pasa sus
+# comprobaciones. Necesita el navegador de Playwright: `npx playwright install chromium`.
+test-ui: ## Corre las comprobaciones sobre las historias, sin ventana
+	@cd $(FRONTEND) && npx vitest run --project=storybook
+
+# El recorrido de navegador (varias piezas juntas, contra la app arrancada) AÚN NO
+# EXISTE: el frontend solo tiene las historias de arriba. Hasta que haya un
+# `playwright.config.*` esta receta falla a propósito en vez de salir en verde sin
+# haber corrido nada.
+test-web: ## Corre el recorrido de navegador (Playwright)
+	@cd $(FRONTEND) && if ls playwright.config.* >/dev/null 2>&1; then \
+		npx playwright test; \
+	else \
+		echo "❌ No hay recorrido de navegador: falta $(FRONTEND)/playwright.config.*"; exit 1; \
+	fi
 
 # ---------------------------------------------------------------------------
 # start
