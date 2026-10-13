@@ -1,0 +1,63 @@
+name: Chromatic
+
+# Publica el Storybook del frontend en Chromatic en cada pull request, para que
+# la revisión visual de las piezas de interfaz esté en el propio PR.
+#
+# El token del proyecto vive en el secreto del repositorio
+# `CHROMATIC_PROJECT_TOKEN` (Settings > Secrets and variables > Actions). No está
+# en ningún fichero.
+#
+# UN PULL REQUEST QUE VIENE DE UN FORK NO RECIBE ESE SECRETO: GitHub no entrega
+# los secretos del repositorio a los trabajos que lanza un fork. La acción se
+# quedaría sin token y el trabajo fallaría sin explicar por qué, así que se salta
+# limpiamente (ver `if` más abajo), igual que hace `revisor.yml`. Una persona de
+# fuera del repositorio abre su PR, y el Storybook de ese cambio no se publica
+# hasta que alguien con acceso lo suba a una rama del repositorio.
+on:
+  pull_request:
+
+# Solo lee el repositorio. Chromatic habla con su propio servicio con el token y
+# no necesita escribir en el repositorio ni comentar el PR por esta vía.
+permissions:
+  contents: read
+
+# Si llegan dos pushes seguidos al mismo PR, solo interesa el último.
+concurrency:
+  group: chromatic-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  chromatic:
+    name: Storybook en Chromatic
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    # Ver el comentario de arriba: un fork no tiene secreto.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      # Chromatic compara contra el historial de git para saber qué cambió, así
+      # que necesita todas las confirmaciones, no solo la última.
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # `--legacy-peer-deps` como en local: así se instala el resto del proyecto.
+      - name: Instalar dependencias del frontend
+        run: npm ci --legacy-peer-deps
+
+      - name: Publicar el Storybook en Chromatic
+        uses: chromaui/action@v18
+        with:
+          projectToken: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
+          workingDir: frontend

@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# pre-push: corre `make test-ui` (las historias del catálogo) antes de que el
+# trabajo salga de esta máquina. Se instala con `make hooks`: un hook de git no
+# viaja en el clon.
+#
+# POR QUÉ SOLO `test-ui` Y NO `test-web`: el recorrido de navegador necesita la
+# aplicación entera levantada (base de datos, backend y frontend, `make start`).
+# Un disparador que falla porque el servidor no estaba no dice nada sobre el
+# código, y uno que falla así se desactiva a la segunda vez que molesta. Las
+# historias no necesitan nada levantado y tardan segundos: son las que merece la
+# pena exigir en cada push. `make test-web` se lanza a mano, con la app en marcha.
+set -uo pipefail
+
+raiz=$(git rev-parse --show-toplevel) || exit 1
+cd "$raiz" || exit 1
+
+if [ ! -d frontend/node_modules ]; then
+  echo "❌ pre-push: faltan las dependencias del frontend, así que no se pueden comprobar las historias." >&2
+  echo "   Instálalas con: make setup" >&2
+  echo "   Para saltarte esta comprobación: git push --no-verify" >&2
+  exit 1
+fi
+
+salida=$(mktemp) || exit 1
+trap 'rm -f "$salida"' EXIT
+
+echo "🧪 pre-push: comprobando las historias del catálogo (make test-ui)..."
+if make test-ui >"$salida" 2>&1; then
+  echo "✅ pre-push: historias en verde."
+  exit 0
+fi
+
+{
+  echo ""
+  sed 's/\x1b\[[0-9;]*m//g' "$salida" | tail -n 25
+  echo ""
+  echo "❌ pre-push: fallan las historias del catálogo. El push se ha cancelado."
+  echo "   Para verlo con detalle:  make test-ui"
+  echo "   Para mirarlo en el navegador:  make ui"
+  echo "   Si de verdad necesitas subirlo igualmente:  git push --no-verify"
+  echo "   (se salta esta y cualquier otra comprobación de git; quien lo revise no verá que no pasó)"
+} >&2
+exit 1

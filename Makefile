@@ -14,7 +14,7 @@ BACKEND  := backend
 FRONTEND := frontend
 
 .DEFAULT_GOAL := help
-.PHONY: test-unit test-e2e help setup start install env db-up db-down migrate seed db-readonly copia-produccion test clean
+.PHONY: test-unit test-e2e help setup start install env db-up db-down migrate seed db-readonly copia-produccion test ui test-ui test-web hooks clean
 
 # La ayuda se genera a partir de los comentarios `## ...` de cada target, para
 # que no haya un segundo listado que mantener a mano y que pueda divergir.
@@ -123,6 +123,34 @@ test-unit: migrate ## Solo la suite unitaria (sin servidor ni base de datos)
 
 test-e2e: migrate ## Solo la suite funcional: peticiones HTTP reales contra la base de pruebas
 	@cd $(BACKEND) && node ace test functional
+
+# ---------------------------------------------------------------------------
+# frontend: catálogo de componentes y pruebas de interfaz
+# ---------------------------------------------------------------------------
+
+ui: ## Arranca el catálogo de componentes (Storybook, http://localhost:6006)
+	@cd $(FRONTEND) && npm run storybook
+
+# Las historias se comprueban en un Chromium sin ventana (ver vite.config.ts).
+test-ui: ## Corre las comprobaciones sobre las historias, sin ventana
+	@cd $(FRONTEND) && npx vitest run --project=storybook
+
+# Es el recorrido de varias piezas en un navegador real, no la suite funcional del
+# backend (esa es `test-e2e`). Necesita la aplicación en marcha (`make start`, en
+# otra terminal) y deja una cuenta y una tarea nuevas en la base de desarrollo. Sin
+# su configuración, la receta lo dice en vez de fingir que pasa.
+test-web: ## Corre el recorrido de navegador (Playwright)
+	@if [ ! -f $(FRONTEND)/playwright.config.ts ]; then \
+		echo "❌ No hay recorrido de navegador: falta $(FRONTEND)/playwright.config.ts."; exit 1; \
+	fi
+	@cd $(FRONTEND) && npx playwright test
+
+# Un hook de git no viaja en el clon: hay que decirle a git dónde están. Una vez por
+# clon. Lo que corre al hacer `git push` está en .githooks/pre-push.
+hooks: ## Instala los hooks de git del repositorio (.githooks): pre-push corre test-ui
+	@chmod +x .githooks/pre-push
+	@git config core.hooksPath .githooks
+	@echo "🪝 Hooks instalados: git push correrá make test-ui antes de subir."
 
 # ---------------------------------------------------------------------------
 # start

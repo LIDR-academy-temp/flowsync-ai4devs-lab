@@ -75,7 +75,7 @@ npm run lint      # oxlint (NO eslint)
 npm run format    # prettier --write .
 ```
 
-No hay runner de tests instalado en el frontend.
+Los tests del frontend se lanzan desde la raíz: `make test-ui` corre las historias de Storybook sin ventana (`vitest --project=storybook`), `make ui` abre el catálogo en `http://localhost:6006` y `make test-web` corre el recorrido de navegador (Playwright, necesita `make start` en otra terminal). `make hooks` instala el `pre-push` que corre `make test-ui` antes de cada push.
 
 ## Arquitectura del backend
 
@@ -142,7 +142,7 @@ El stack va deliberadamente en versiones muy recientes: **AdonisJS 7, Lucid 22, 
 
 ## Frontend
 
-El typecheck vive dentro de `npm run build`; el lint es **oxlint** (`.oxlintrc.json`), no eslint. El formateo es Prettier (`.prettierrc.json`: `semi: false`, `singleQuote: true`, para respetar el estilo ya existente); un hook `PostToolUse` en `.claude/settings.json` lo corre automáticamente sobre cada fichero de `frontend/` que Claude edite. No hay runner de tests instalado.
+El typecheck vive dentro de `npm run build`; el lint es **oxlint** (`.oxlintrc.json`), no eslint. El formateo es Prettier (`.prettierrc.json`: `semi: false`, `singleQuote: true`, para respetar el estilo ya existente); un hook `PostToolUse` en `.claude/settings.json` lo corre automáticamente sobre cada fichero de `frontend/` que Claude edite. Las pruebas son las historias (`make test-ui`) y un único recorrido de navegador en `frontend/e2e/` (`make test-web`).
 
 Stack: **Tailwind v4** (plugin de Vite, sin `tailwind.config.js`; los tokens viven en `src/index.css`), **shadcn/ui** (`components.json`, componentes generados en `src/components/ui/` — se traen con `npx shadcn@latest add <componente>` y no se editan a mano) y **react-router**. El alias `@/*` → `src/*` está declarado a la vez en `tsconfig.app.json` (sin `baseUrl`, deprecado en TS 6) y en `vite.config.ts`.
 
@@ -153,11 +153,21 @@ Organización de `src/`:
 - `routes/` — `app-routes.tsx` más los guards `protected-route.tsx` y `public-only-route.tsx`.
 - `pages/`, `components/` — pantallas y componentes propios.
 
+### De dónde sale una pieza de interfaz nueva
+
+Antes de escribir un botón, un aviso, una tarjeta, un campo o cualquier otro elemento de interfaz, se mira `src/components/ui/`. Hoy hay: `alert`, `button`, `card`, `input`, `label` y `progress` (la lista de verdad es el directorio; esta puede quedarse vieja).
+
+- **Si la pieza está**, se compone con ella y con sus variantes y tamaños, no se imita con un `<div>` y clases.
+- **Si falta**, se trae con el CLI del catálogo (`npx shadcn@latest add <componente>`, desde `frontend/`) en vez de escribirse a mano. Después se revisa lo que ha traído: `progress` llegó con `import { cn } from "cn"` y el CLI instaló un paquete ajeno con ese nombre; hubo que quitarlo y apuntar el import a `@/lib/utils`.
+- **Si de verdad no hay pieza** y se dibuja un elemento de interfaz por cuenta propia fuera de `ui/`, es una decisión que se declara, no un descuido: un comentario en el propio componente que diga qué se hizo a mano y por qué no vale el catálogo, y se menciona al cerrar la petición. Un contenedor de maquetación no cuenta.
+- **Los colores salen de los tokens** de `src/index.css` (`bg-primary`, `text-destructive`, `text-muted-foreground`…), no de un hexadecimal ni de la paleta cruda (`bg-blue-600`). El hook `PostToolUse` `.claude/hooks/color-con-nombre.sh` avisa cuando se escribe uno en `frontend/src/`; avisa y no bloquea, porque hay casos legítimos, pero la desviación se explica.
+
 La URL de la API sale de `VITE_API_URL` (ver `frontend/.env.example`); por defecto `http://localhost:3333`.
 
 ## Reglas de proceso
 - Convenciones de base de datos (única fuente, no se copian aquí): @docs/convenciones/base-de-datos.md
 - Cualquier tarea de backend se hace con la skill `backend-feature` (`.claude/skills/backend-feature/SKILL.md`), sin que nadie tenga que pedirlo: plan por capas y parada para aprobarlo, tests de contrato con el subagente `test-writer`, rojo, tests congelados por su `shasum`, implementación con el subagente `implementer` hasta el verde, y cierre con `dbhub`, `openapi:check` y Postman.
+- Cualquier pieza de interfaz nueva se hace con la skill `frontend-feature` (`.claude/skills/frontend-feature/SKILL.md`), sin que nadie tenga que pedirlo: plan con la pieza, de dónde sale cada parte (catálogo, CLI de shadcn o nueva y declarada) y la lista de estados con su historia, y parada para aprobarlo; historias con el subagente `story-writer`, rojo con `make test-ui`, historias congeladas por su `shasum`, implementación con el subagente `ui-implementer` hasta el verde, y cierre con lint, build, commit y pull request.
 - La rama es por unidad de trabajo, no por petición. Antes de tocar código, mira en qué rama estás: si ya es una rama de trabajo —cualquiera que no sea `main` ni una `sN/*`—, sigue en ella en vez de crear otra. Solo desde `main` o desde una `sN/*` se crea una nueva (`git checkout -b feat/<slug>`). Nunca commitear directo en `main` ni en una `sN/*`.
 - El commit sí es por petición: al cerrar cada una, usar la skill `/commit`.
 - Un cambio que toque rutas, controladores, validadores o transformers de una capability se cierra en el mismo commit con el documento OpenAPI y el README de esa capability al día. El documento se construye en cada petición y no hay fichero que generar, así que lo que se commitea es el diff regenerado de `.adonisjs/`; el README es `docs/capabilities/<nombre>/README.md`.
