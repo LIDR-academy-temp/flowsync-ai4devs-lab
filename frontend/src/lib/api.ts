@@ -6,6 +6,7 @@ import type {
   Task,
   TaskDetail,
   TaskStatus,
+  TaskSummary,
   User,
 } from '@/lib/types'
 
@@ -235,6 +236,16 @@ export function listTasks(token: string, status?: string): Promise<Task[]> {
   return request<{ data: Task[] }>(`/api/v1/tasks${query}`, { token }).then(
     (response) => response.data,
   )
+}
+
+/**
+ * El recuento por estado de todo el espacio. No depende de ningún filtro de la
+ * lista: es justo lo que la lista, que enseña un solo estado, no puede decir.
+ */
+export function getTasksSummary(token: string): Promise<TaskSummary> {
+  return request<{ data: TaskSummary }>('/api/v1/tasks/summary', {
+    token,
+  }).then((response) => response.data)
 }
 
 export function createTask(

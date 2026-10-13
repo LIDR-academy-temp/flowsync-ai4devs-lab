@@ -325,6 +325,49 @@
           "data"
         ]
       },
+      "TaskSummaryResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/TaskSummary"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "TaskSummary": {
+        "type": "object",
+        "properties": {
+          "pending": {
+            "type": "integer",
+            "minimum": 0,
+            "example": 2
+          },
+          "inProgress": {
+            "type": "integer",
+            "minimum": 0,
+            "example": 1
+          },
+          "done": {
+            "type": "integer",
+            "minimum": 0,
+            "example": 3
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "example": 6,
+            "description": "La suma de los tres anteriores. Las tareas de la papelera no cuentan."
+          }
+        },
+        "required": [
+          "pending",
+          "inProgress",
+          "done",
+          "total"
+        ]
+      },
       "UpdateTaskStatusBody": {
         "type": "object",
         "properties": {
@@ -871,6 +914,43 @@
             }
           }
         ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/tasks/summary": {
+      "get": {
+        "summary": "Resumen de tareas por estado",
+        "description": "Devuelve cuántas tareas hay pendientes, en curso y hechas, y el total (la suma de las tres), contando todo el espacio salvo la papelera. Es la misma para cualquier cuenta con sesión, de solo lectura y no devuelve tareas, solo números. No admite parámetros: un `status` en la dirección se ignora, a diferencia de la lista.",
+        "tags": [
+          "TaskSummary"
+        ],
+        "responses": {
+          "200": {
+            "description": "El recuento. En un espacio sin tareas los cuatro valores son `0`, no un error ni una respuesta vacía.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskSummaryResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Falta el token o no es válido. No se devuelve ningún recuento.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [],
         "security": [
           {
             "bearer": []

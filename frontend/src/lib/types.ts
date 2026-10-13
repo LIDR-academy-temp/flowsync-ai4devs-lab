@@ -37,6 +37,17 @@ export const TASK_STATUSES = ['pending', 'in_progress', 'done'] as const
 export type TaskStatus = (typeof TASK_STATUSES)[number]
 
 /**
+ * Cuántas tareas hay en cada estado en todo el espacio, sin contar la
+ * papelera. Respuesta de `GET /tasks/summary`; `total` es la suma de los tres.
+ */
+export type TaskSummary = {
+  pending: number
+  inProgress: number
+  done: number
+  total: number
+}
+
+/**
  * Lo que enseña la lista cuando no se pide ningún filtro: lo que sigue
  * abierto. Espejo de `DEFAULT_LIST_STATUSES` del backend, y tiene que seguir
  * siéndolo — es el mismo predicado el que aplica el servidor al consultar y el

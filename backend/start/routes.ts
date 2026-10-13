@@ -52,6 +52,8 @@ router
         router.post('/', [controllers.Tasks, 'store'])
         // `trash` va antes que `:id`: si no, «trash» se leería como un identificador.
         router.get('trash', [controllers.TaskTrash, 'index'])
+        // `summary` también va antes que `:id`, por lo mismo: no es un identificador.
+        router.get('summary', [controllers.TaskSummary, 'show'])
         router.get(':id', [controllers.Tasks, 'show'])
         router.delete(':id', [controllers.Tasks, 'destroy'])
         router.post(':id/restore', [controllers.TaskTrash, 'restore'])

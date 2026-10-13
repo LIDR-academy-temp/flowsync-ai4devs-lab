@@ -8,6 +8,7 @@ import type { InferData, InferVariants } from '@adonisjs/core/types/transformers
 import type CommentTransformer from '#transformers/comment_transformer'
 import type TaskAssigneeTransformer from '#transformers/task_assignee_transformer'
 import type TaskDetailTransformer from '#transformers/task_detail_transformer'
+import type TaskSummaryTransformer from '#transformers/task_summary_transformer'
 import type TaskTransformer from '#transformers/task_transformer'
 import type TrashedTaskTransformer from '#transformers/trashed_task_transformer'
 import type UserTransformer from '#transformers/user_transformer'
@@ -24,6 +25,10 @@ export namespace Data {
   export type TaskDetail = InferData<TaskDetailTransformer>
   export namespace TaskDetail {
     export type Variants = InferVariants<TaskDetailTransformer>
+  }
+  export type TaskSummary = InferData<TaskSummaryTransformer>
+  export namespace TaskSummary {
+    export type Variants = InferVariants<TaskSummaryTransformer>
   }
   export type Task = InferData<TaskTransformer>
   export namespace Task {

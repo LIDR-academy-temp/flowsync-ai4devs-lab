@@ -150,6 +150,29 @@ export class TrashedTask {
 }
 
 /**
+ * El recuento de tareas por estado (`TaskSummaryTransformer`). Solo números: ninguna
+ * tarea. `total` es siempre `pending + inProgress + done`.
+ */
+export class TaskSummary {
+  @ApiProperty({ type: 'integer', minimum: 0, example: 2 })
+  pending!: number
+
+  @ApiProperty({ type: 'integer', minimum: 0, example: 1 })
+  inProgress!: number
+
+  @ApiProperty({ type: 'integer', minimum: 0, example: 3 })
+  done!: number
+
+  @ApiProperty({
+    type: 'integer',
+    minimum: 0,
+    example: 6,
+    description: 'La suma de los tres anteriores. Las tareas de la papelera no cuentan.',
+  })
+  total!: number
+}
+
+/**
  * Un comentario de una tarea (`CommentTransformer`). No lleva el identificador de la
  * tarea: se pide siempre colgado de ella.
  */
@@ -195,6 +218,11 @@ export class TaskListResponse {
 export class TaskDetailResponse {
   @ApiProperty({ type: () => TaskDetail })
   data!: TaskDetail
+}
+
+export class TaskSummaryResponse {
+  @ApiProperty({ type: () => TaskSummary })
+  data!: TaskSummary
 }
 
 export class TrashedTaskResponse {

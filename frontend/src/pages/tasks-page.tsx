@@ -7,6 +7,7 @@ import { useAuth } from '@/auth/use-auth'
 import { useAuthForm } from '@/auth/use-auth-form'
 import { TaskItem } from '@/components/task-item'
 import { TaskFilter } from '@/components/task-filter'
+import { TaskProgress } from '@/components/task-progress'
 import { FieldError } from '@/components/field-error'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
@@ -18,9 +19,37 @@ import {
   TASK_STATUS_LABELS,
   type Task,
   type TaskStatus,
+  type TaskSummary,
 } from '@/lib/types'
 
 const FIELDS = ['title'] as const
+
+const SUMMARY_KEYS = {
+  pending: 'pending',
+  in_progress: 'inProgress',
+  done: 'done',
+} as const satisfies Record<TaskStatus, keyof Omit<TaskSummary, 'total'>>
+
+/**
+ * El recuento después de mover una tarea de `from` a `to` (o de crearla, con
+ * `from` a `null`). Calcularlo aquí en vez de volver a pedirlo es lo que lo
+ * deja a la par del pintado optimista de la fila; `total` se rehace sumando,
+ * igual que lo hace el servidor.
+ */
+function shiftSummary(
+  current: TaskSummary | null,
+  from: TaskStatus | null,
+  to: TaskStatus,
+): TaskSummary | null {
+  if (!current) return current
+
+  const next = { ...current }
+  if (from) next[SUMMARY_KEYS[from]] -= 1
+  next[SUMMARY_KEYS[to]] += 1
+  next.total = next.pending + next.inProgress + next.done
+
+  return next
+}
 
 export function TasksPage() {
   const { user, token } = useAuth()
@@ -45,6 +74,10 @@ export function TasksPage() {
   // Cuántas tareas hechas hay, para distinguir «el espacio está vacío» de
   // «no queda nada abierto». Solo se resuelve cuando hace falta.
   const [doneCount, setDoneCount] = useState<number | null>(null)
+  // El recuento por estado de todo el espacio, para la barra de progreso. Va
+  // aparte de la lista porque no depende del filtro; si no llega, la barra
+  // simplemente no se pinta y la lista sigue a lo suyo.
+  const [summary, setSummary] = useState<TaskSummary | null>(null)
   const [title, setTitle] = useState('')
   const [statusError, setStatusError] = useState<string | null>(null)
   // Lo que una acción mía se ha llevado fuera de la vista actual. No es un
@@ -117,6 +150,26 @@ export function TasksPage() {
     }
   }, [token, statusParam])
 
+  useEffect(() => {
+    if (!token) return
+
+    let cancelled = false
+
+    setSummary(null)
+
+    api
+      .getTasksSummary(token)
+      .then((loaded) => {
+        if (!cancelled) setSummary(loaded)
+      })
+      // Sin la barra la pantalla sigue entera: no es un error que mostrar.
+      .catch(() => {})
+
+    return () => {
+      cancelled = true
+    }
+  }, [token])
+
   const handleFilter = (status: TaskStatus | null) => {
     // Quitar el filtro es borrar el parámetro, no poner uno que diga «todas»:
     // la vista por defecto es la ausencia de filtro, no un filtro más.
@@ -141,6 +194,7 @@ export function TasksPage() {
       // La API devuelve la lista con las más recientes primero, así que la
       // recién creada entra por arriba. Sin recargar ni volver a pedirla.
       setTasks((current) => [created, ...(current ?? [])])
+      setSummary((current) => shiftSummary(current, null, created.status))
       setTitle('')
 
       // Toda tarea nace pendiente, así que con el filtro puesto en otro estado
@@ -168,6 +222,7 @@ export function TasksPage() {
             item.id === task.id ? { ...item, status } : item,
           ) ?? current,
       )
+      setSummary((current) => shiftSummary(current, previousStatus, status))
       setPendingIds((current) => new Set(current).add(task.id))
       setStatusError(null)
       setNotice(
@@ -192,6 +247,7 @@ export function TasksPage() {
               item.id === task.id ? { ...item, status: previousStatus } : item,
             ) ?? current,
         )
+        setSummary((current) => shiftSummary(current, status, previousStatus))
         setNotice(null)
         setStatusError(
           `No se ha podido cambiar el estado. ${
@@ -323,16 +379,21 @@ export function TasksPage() {
             </AlertDescription>
           </Alert>
         ) : visibleTasks.length > 0 ? (
-          <ul className="bg-background divide-y rounded-lg border">
-            {visibleTasks.map((task) => (
-              <TaskItem
-                key={task.id}
-                task={task}
-                onChangeStatus={handleChangeStatus}
-                isBusy={pendingIds.has(task.id)}
-              />
-            ))}
-          </ul>
+          <>
+            {summary && summary.total > 0 && (
+              <TaskProgress done={summary.done} total={summary.total} />
+            )}
+            <ul className="bg-background divide-y rounded-lg border">
+              {visibleTasks.map((task) => (
+                <TaskItem
+                  key={task.id}
+                  task={task}
+                  onChangeStatus={handleChangeStatus}
+                  isBusy={pendingIds.has(task.id)}
+                />
+              ))}
+            </ul>
+          </>
         ) : statusParam ? (
           // Segundo final: el filtro es válido y ahora mismo no hay nada en
           // ese estado. Es una respuesta legítima, no un fallo.

@@ -25,11 +25,31 @@ de `POST /api/v1/auth/login` o de `POST /api/v1/auth/signup`.
 | `PATCH /tasks/:id/status` | `{ "status": "pending \| in_progress \| done" }` | [`TaskStatusesController.update`](../../../backend/app/controllers/task_statuses_controller.ts) | `200` · la tarea ya cambiada |
 | `PUT /tasks/:id/due-date` | `{ "dueDate": "AAAA-MM-DD" \| null, "today": "AAAA-MM-DD" }` | [`TaskDueDatesController.update`](../../../backend/app/controllers/task_due_dates_controller.ts) | `200` · la tarea con vencimiento |
 | `DELETE /tasks/:id` | — | [`TasksController.destroy`](../../../backend/app/controllers/tasks_controller.ts) | `200` · la tarea, ya en la papelera |
+| `GET /tasks/summary` | — (si llega `status`, se ignora) | [`TaskSummaryController.show`](../../../backend/app/controllers/task_summary_controller.ts) | `200` · cuántas tareas hay por estado y el total |
 | `GET /tasks/trash` | — | [`TaskTrashController.index`](../../../backend/app/controllers/task_trash_controller.ts) | `200` · la papelera |
 | `POST /tasks/:id/restore` | — | [`TaskTrashController.restore`](../../../backend/app/controllers/task_trash_controller.ts) | `200` · la tarea restaurada, con forma de lista |
 
 Toda respuesta va envuelta en `{ "data": ... }` por el serializer de
 [`providers/api_provider.ts`](../../../backend/providers/api_provider.ts).
+
+### El resumen por estado
+
+`GET /tasks/summary` no devuelve tareas, solo números, con la forma que da
+[`TaskSummaryTransformer`](../../../backend/app/transformers/task_summary_transformer.ts):
+
+```json
+{ "data": { "pending": 2, "inProgress": 1, "done": 3, "total": 6 } }
+```
+
+Cuenta todo el espacio salvo la papelera, es la misma para cualquier cuenta con sesión y no admite
+parámetros: un `?status=` se ignora (ni filtra ni da `422`, a diferencia de la lista). Un estado sin
+tareas sale a `0`, no falta. `total` es `pending + inProgress + done`; una fila con un estado fuera de
+los tres (la columna no tiene `CHECK`) no cuenta en nada. Es una sola consulta agrupada por estado que
+excluye la papelera con un `whereNull('tasks.deleted_at')` explícito: el hook `Task.hideTrashed` no se
+ejecuta en una consulta agregada que devuelve filas planas. La ruta se declara antes que `:id`. Lo manda
+el requisito *Resumen de tareas por estado* del change
+[`progreso-de-tareas-hechas`](../../../openspec/changes/progreso-de-tareas-hechas/specs/tasks/spec.md),
+aún sin archivar en `openspec/specs/`.
 
 ### Tres formas de tarea, no una
 
@@ -71,7 +91,7 @@ recorta a `id`, `fullName` e `initials` — nunca el email.
 
 ### El contrato, servido
 
-Las ocho operaciones están anotadas con los decoradores de `@foadonis/openapi` sobre los propios
+Las operaciones de la tabla están anotadas con los decoradores de `@foadonis/openapi` sobre los propios
 controladores, así que el documento servido en **`/api.json`** (y la interfaz en `/api`) lleva el
 parámetro `status` con sus tres valores, el `today` obligatorio, los cuerpos de las escrituras y los
 códigos `200`/`201`/`401`/`404`/`422` de cada operación, cada uno con la forma de lo que devuelve.
@@ -142,12 +162,12 @@ node ace test --tests="el responsable llega con su nombre y sus iniciales"
 ```
 
 Los tests de esta capability están en
-[`backend/tests/functional/tasks/`](../../../backend/tests/functional/tasks/). **Hoy hay dos
-ficheros**: `assignee.spec.ts`, que cubre 3 de los 124 scenarios de la spec (los del requisito *Lo que
-cada tarea muestra de su responsable*), y `trash.spec.ts`, con 17 tests de la papelera (E2-10): un test
-por cada criterio de la historia que se puede probar contra la API, y CA-8c recorrido ruta por ruta.
-Todo lo demás está sin cubrir, así que el verde de la suite **no** es señal de que la capability cumpla
-su spec.
+[`backend/tests/functional/tasks/`](../../../backend/tests/functional/tasks/). **El README no
+enumera ya todos los ficheros**; los que importan aquí: `assignee.spec.ts`, que cubre 3 de los 124
+scenarios de la spec (los del requisito *Lo que cada tarea muestra de su responsable*), `trash.spec.ts`,
+con 17 tests de la papelera (E2-10), y `summary.spec.ts`, con un test por scenario de *Resumen de tareas
+por estado*. Lo que no tiene su fichero está sin cubrir, así que el verde de la suite **no** es señal de
+que la capability cumpla su spec.
 
 Dos cosas que hay que saber antes de escribir un test aquí:
 
@@ -199,7 +219,10 @@ curl -s -X PUT http://localhost:3333/api/v1/tasks/1/due-date \
 # 7. Borrar: va a la papelera y sale de la lista
 curl -s -X DELETE http://localhost:3333/api/v1/tasks/1 -H "Authorization: Bearer $TOKEN"
 
-# 8. La papelera, y restaurar
+# 8. El resumen por estado: números, no tareas
+curl -s http://localhost:3333/api/v1/tasks/summary -H "Authorization: Bearer $TOKEN"
+
+# 9. La papelera, y restaurar
 curl -s http://localhost:3333/api/v1/tasks/trash -H "Authorization: Bearer $TOKEN"
 curl -s -X POST http://localhost:3333/api/v1/tasks/1/restore -H "Authorization: Bearer $TOKEN"
 ```
@@ -216,6 +239,14 @@ cd frontend && npm install && npm run dev       # http://localhost:5173
 La lista está en `/tasks`, una tarea en `/tasks/:id`, y el filtro viaja en la URL como `?status=`.
 **El frontend no tiene runner de tests instalado**, así que los requisitos de interfaz de la spec
 —más de la mitad de sus scenarios— solo se pueden comprobar a mano.
+
+Encima del listado hay una barra de progreso con «X de Y hechas · Z %»
+([`TaskProgress`](../../../frontend/src/components/task-progress.tsx), compuesta con `Progress` de shadcn).
+Sale de `GET /tasks/summary`, así que cuenta todo el espacio y no las filas visibles: con la vista por
+defecto, que deja fuera lo hecho, sigue enseñando cuánto hay hecho. El porcentaje se redondea hacia
+abajo. No se pinta si la lista no tiene filas (carga, espacio vacío, filtro sin resultados o inventado,
+fallo de carga) ni si el resumen no llega. Se ajusta en el acto al crear una tarea y al cambiar su
+estado, y vuelve atrás si el cambio falla.
 
 ### Antes de dar algo por terminado
 

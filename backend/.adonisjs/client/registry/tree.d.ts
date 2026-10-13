@@ -34,6 +34,9 @@ export interface ApiDefinition {
       index: typeof routes['tasks.task_trash.index']
       restore: typeof routes['tasks.task_trash.restore']
     }
+    taskSummary: {
+      show: typeof routes['tasks.task_summary.show']
+    }
     taskStatuses: {
       update: typeof routes['tasks.task_statuses.update']
     }

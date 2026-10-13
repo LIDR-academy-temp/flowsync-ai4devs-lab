@@ -66,6 +66,12 @@ const routes = {
     tokens: [{"old":"/api/v1/tasks/trash","type":0,"val":"api","end":""},{"old":"/api/v1/tasks/trash","type":0,"val":"v1","end":""},{"old":"/api/v1/tasks/trash","type":0,"val":"tasks","end":""},{"old":"/api/v1/tasks/trash","type":0,"val":"trash","end":""}],
     types: placeholder as Registry['tasks.task_trash.index']['types'],
   },
+  'tasks.task_summary.show': {
+    methods: ["GET","HEAD"],
+    pattern: '/api/v1/tasks/summary',
+    tokens: [{"old":"/api/v1/tasks/summary","type":0,"val":"api","end":""},{"old":"/api/v1/tasks/summary","type":0,"val":"v1","end":""},{"old":"/api/v1/tasks/summary","type":0,"val":"tasks","end":""},{"old":"/api/v1/tasks/summary","type":0,"val":"summary","end":""}],
+    types: placeholder as Registry['tasks.task_summary.show']['types'],
+  },
   'tasks.tasks.show': {
     methods: ["GET","HEAD"],
     pattern: '/api/v1/tasks/:id',
