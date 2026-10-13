@@ -14,7 +14,7 @@ BACKEND  := backend
 FRONTEND := frontend
 
 .DEFAULT_GOAL := help
-.PHONY: test-unit test-e2e ui test-ui test-web help setup start install env db-up db-down migrate seed db-readonly copia-produccion test clean
+.PHONY: test-unit test-e2e ui test-ui test-web hooks help setup start install env db-up db-down migrate seed db-readonly copia-produccion test clean
 
 # La ayuda se genera a partir de los comentarios `## ...` de cada target, para
 # que no haya un segundo listado que mantener a mano y que pueda divergir.
@@ -135,6 +135,12 @@ ui: ## Arranca el catálogo de componentes (Storybook, http://localhost:6006)
 # comprobaciones. Necesita el navegador de Playwright: `npx playwright install chromium`.
 test-ui: ## Corre las comprobaciones sobre las historias, sin ventana
 	@cd $(FRONTEND) && npx vitest run --project=storybook
+
+# Un hook de git no viaja en el clon: esto lo activa en el tuyo. `core.hooksPath`
+# sustituye a .git/hooks, que no lleva más que los ejemplos de git.
+hooks: ## Instala el hook pre-push de git (corre make test-ui antes de cada push)
+	@git config core.hooksPath .githooks
+	@echo "✅ Hooks activados (.githooks). Para saltarte el pre-push una vez: git push --no-verify"
 
 # El recorrido de navegador (varias piezas juntas, contra la app arrancada): un solo
 # test en frontend/e2e/. Necesita `make start` corriendo en otra terminal, y crea una

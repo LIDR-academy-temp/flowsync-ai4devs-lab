@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# pre-push de git: antes de que el trabajo salga de esta máquina, corre
+# `make test-ui`, las comprobaciones de las historias del catálogo. Tardan
+# segundos y no necesitan nada levantado.
+#
+# Se instala con `make hooks` (git config core.hooksPath .githooks): un hook de
+# git no viaja en el clon, así que cada persona lo activa una vez en el suyo.
+#
+# Lo que NO corre aquí es `make test-web`, el recorrido de navegador, y es a
+# propósito: necesita la aplicación entera levantada (las bases, el backend y el
+# frontend, `make start`) y crea una cuenta y una tarea de verdad. Un disparador
+# que falla porque el servidor no estaba arriba no avisa de ningún fallo del
+# código, y un disparador que falla sin razón se desactiva a la segunda vez, y
+# con él la comprobación que sí valía. `make test-web` se lanza a mano.
+set -uo pipefail
+
+# Borrar una rama o una etiqueta del remoto no manda código: no hay nada que
+# comprobar. Git pasa por la entrada estándar una línea por referencia:
+#   <ref local> <sha local> <ref remota> <sha remoto>
+# y un sha local de solo ceros es un borrado.
+manda_codigo=0
+while read -r _ sha_local _ _; do
+  if [[ ! "$sha_local" =~ ^0+$ ]]; then
+    manda_codigo=1
+  fi
+done
+[ "$manda_codigo" -eq 1 ] || exit 0
+
+cd "$(git rev-parse --show-toplevel)" || exit 1
+
+echo "pre-push: comprobando el catálogo (make test-ui)..." >&2
+if make test-ui; then
+  exit 0
+fi
+
+{
+  echo ""
+  echo "PUSH CANCELADO: fallan las comprobaciones de las historias del catálogo."
+  echo "Para verlo con detalle: \`make test-ui\`, o \`make ui\` para abrir las historias en el navegador."
+  echo "Si el fallo es que falta el navegador de las pruebas: \`cd frontend && npx playwright install chromium\`."
+  echo "Si de verdad necesitas subirlo igualmente: \`git push --no-verify\` se salta este hook."
+  echo "Existe para que lo que sale de aquí ya haya pasado las historias; saltárselo es posible y es decisión tuya."
+} >&2
+exit 1
